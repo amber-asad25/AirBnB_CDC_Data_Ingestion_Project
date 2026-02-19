@@ -1,0 +1,89 @@
+{
+	"name": "New_BookingDataCosmosDBSource",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "CosmosDBConn",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "CosmosDbSqlApiCollection",
+		"schema": {
+			"type": "object",
+			"properties": {
+				"booking_id": {
+					"type": "string"
+				},
+				"customer_id": {
+					"type": "string"
+				},
+				"listing_id": {
+					"type": "string"
+				},
+				"status": {
+					"type": "string"
+				},
+				"booking_created_at": {
+					"type": "string"
+				},
+				"checkin_date": {
+					"type": "string"
+				},
+				"checkout_date": {
+					"type": "string"
+				},
+				"nights": {
+					"type": "integer"
+				},
+				"lead_time_days": {
+					"type": "integer"
+				},
+				"guests_adults": {
+					"type": "integer"
+				},
+				"guests_children": {
+					"type": "integer"
+				},
+				"guests_infants": {
+					"type": "integer"
+				},
+				"price_nightly": {
+					"type": "number"
+				},
+				"cleaning_fee": {
+					"type": "number"
+				},
+				"total_amount": {
+					"type": "number"
+				},
+				"currency": {
+					"type": "string"
+				},
+				"country_code": {
+					"type": "string"
+				},
+				"city": {
+					"type": "string"
+				},
+				"channel": {
+					"type": "string"
+				},
+				"device_type": {
+					"type": "string"
+				},
+				"cancellation_ts": {
+					"type": "null"
+				},
+				"cancellation_reason": {
+					"type": "null"
+				},
+				"updated_at": {
+					"type": "string"
+				}
+			}
+		},
+		"typeProperties": {
+			"collectionName": "bookings"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,1034 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "airbnb-near-realtime-datapipeline"
+		},
+		"ADLSConn_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'ADLSConn'"
+		},
+		"CosmosDBConn_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'CosmosDBConn'"
+		},
+		"ADLSConn_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://projectstorageaccountgds.dfs.core.windows.net/"
+		},
+		"SynapseConn_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "synapse-ne-workspace.sql.azuresynapse.net"
+		},
+		"SynapseConn_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "synapsedwh"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/New_FinalAirBnBPipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "RunLoadCustomerDimPipeline",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "New_LoadCustomerDim",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "RunLoadBookingFactPipeline",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "RunLoadCustomerDimPipeline",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "New_LoadBookingFact",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-02-19T11:44:41Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/New_LoadCustomerDim')]",
+				"[concat(variables('factoryId'), '/pipelines/New_LoadBookingFact')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_LoadBookingFact')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "BookingTransformation",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "New_BookingTransformation",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"BookingSourceCosmos": {},
+									"SynapseBookingFactTarget": {},
+									"SynapseTargetWrite": {}
+								}
+							},
+							"staging": {
+								"linkedService": {
+									"referenceName": "ADLSConn",
+									"type": "LinkedServiceReference"
+								},
+								"folderPath": "synapse-store"
+							},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine",
+							"continuationSettings": {
+								"customizedCheckpointKey": "7dcf66a4-5830-45e1-824b-55017a91e67b"
+							}
+						}
+					},
+					{
+						"name": "PopulateAggregateTable",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "BookingTransformation",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[airbnb].[BookingAggregation]"
+						},
+						"linkedServiceName": {
+							"referenceName": "SynapseConn",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-02-19T11:42:44Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/New_BookingTransformation')]",
+				"[concat(variables('factoryId'), '/linkedServices/ADLSConn')]",
+				"[concat(variables('factoryId'), '/linkedServices/SynapseConn')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_LoadCustomerDim')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CustomerRawFilesMetadata",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "New_CustomerDataSource",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "DelimitedTextReadSettings"
+							}
+						}
+					},
+					{
+						"name": "ProcessEachCustomerFile",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "CustomerRawFilesMetadata",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('CustomerRawFilesMetadata').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "CopyCustomerDataToSynapse",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"wildcardFolderPath": "customer-raw-data",
+												"wildcardFileName": {
+													"value": "@item().name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "SqlDWSink",
+											"writeBehavior": "Upsert",
+											"upsertSettings": {
+												"keys": [
+													"customer_id"
+												],
+												"interimSchemaName": ""
+											},
+											"sqlWriterUseTableLock": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "New_CustomerDataSource",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "New_CustomerDimSynapse",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									]
+								},
+								{
+									"name": "CopyDataInArchive",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "CopyCustomerDataToSynapse",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"wildcardFolderPath": "customer-raw-data",
+												"wildcardFileName": {
+													"value": "@item().name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".csv"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "New_CustomerDataSource",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "New_CustomerDataArchive",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									]
+								},
+								{
+									"name": "DeleteSourceFile",
+									"type": "Delete",
+									"dependsOn": [
+										{
+											"activity": "CopyDataInArchive",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataset": {
+											"referenceName": "New_CustomerDataSource",
+											"type": "DatasetReference",
+											"parameters": {}
+										},
+										"enableLogging": false,
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"wildcardFileName": {
+												"value": "@item().name",
+												"type": "Expression"
+											},
+											"enablePartitionDiscovery": false
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-02-19T11:42:44Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/New_CustomerDataSource')]",
+				"[concat(variables('factoryId'), '/datasets/New_CustomerDimSynapse')]",
+				"[concat(variables('factoryId'), '/datasets/New_CustomerDataArchive')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_BookingDataCosmosDBSource')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "CosmosDBConn",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "CosmosDbSqlApiCollection",
+				"schema": {
+					"type": "object",
+					"properties": {
+						"booking_id": {
+							"type": "string"
+						},
+						"customer_id": {
+							"type": "string"
+						},
+						"listing_id": {
+							"type": "string"
+						},
+						"status": {
+							"type": "string"
+						},
+						"booking_created_at": {
+							"type": "string"
+						},
+						"checkin_date": {
+							"type": "string"
+						},
+						"checkout_date": {
+							"type": "string"
+						},
+						"nights": {
+							"type": "integer"
+						},
+						"lead_time_days": {
+							"type": "integer"
+						},
+						"guests_adults": {
+							"type": "integer"
+						},
+						"guests_children": {
+							"type": "integer"
+						},
+						"guests_infants": {
+							"type": "integer"
+						},
+						"price_nightly": {
+							"type": "number"
+						},
+						"cleaning_fee": {
+							"type": "number"
+						},
+						"total_amount": {
+							"type": "number"
+						},
+						"currency": {
+							"type": "string"
+						},
+						"country_code": {
+							"type": "string"
+						},
+						"city": {
+							"type": "string"
+						},
+						"channel": {
+							"type": "string"
+						},
+						"device_type": {
+							"type": "string"
+						},
+						"cancellation_ts": {
+							"type": "null"
+						},
+						"cancellation_reason": {
+							"type": "null"
+						},
+						"updated_at": {
+							"type": "string"
+						}
+					}
+				},
+				"typeProperties": {
+					"collectionName": "bookings"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/CosmosDBConn')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_BookingsFactSynapse')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "SynapseConn",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlDWTable",
+				"schema": [
+					{
+						"name": "booking_id",
+						"type": "nvarchar"
+					},
+					{
+						"name": "customer_id",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "listing_id",
+						"type": "nvarchar"
+					},
+					{
+						"name": "status",
+						"type": "nvarchar"
+					},
+					{
+						"name": "booking_created_at",
+						"type": "date"
+					},
+					{
+						"name": "checkin_date",
+						"type": "date"
+					},
+					{
+						"name": "checkout_date",
+						"type": "date"
+					},
+					{
+						"name": "nights",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "lead_time_days",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "guests_adults",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "guests_children",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "guests_infants",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "price_nightly",
+						"type": "decimal",
+						"precision": 12,
+						"scale": 2
+					},
+					{
+						"name": "cleaning_fee",
+						"type": "decimal",
+						"precision": 12,
+						"scale": 2
+					},
+					{
+						"name": "total_amount",
+						"type": "decimal",
+						"precision": 14,
+						"scale": 2
+					},
+					{
+						"name": "currency",
+						"type": "nvarchar"
+					},
+					{
+						"name": "country_code",
+						"type": "nvarchar"
+					},
+					{
+						"name": "city",
+						"type": "nvarchar"
+					},
+					{
+						"name": "channel",
+						"type": "nvarchar"
+					},
+					{
+						"name": "device_type",
+						"type": "nvarchar"
+					},
+					{
+						"name": "cancellation_ts",
+						"type": "datetime2",
+						"scale": 7
+					},
+					{
+						"name": "cancellation_reason",
+						"type": "nvarchar"
+					},
+					{
+						"name": "updated_at",
+						"type": "datetime2",
+						"scale": 7
+					}
+				],
+				"typeProperties": {
+					"schema": "airbnb",
+					"table": "fact_booking"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/SynapseConn')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_CustomerDataArchive')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ADLSConn",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "customer-data-archive",
+						"fileSystem": "airbnb"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ADLSConn')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_CustomerDataSource')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ADLSConn",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "customer-raw-data",
+						"fileSystem": "airbnb"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ADLSConn')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_CustomerDimSynapse')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "SynapseConn",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlDWTable",
+				"schema": [
+					{
+						"name": "customer_id",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "first_name",
+						"type": "nvarchar"
+					},
+					{
+						"name": "last_name",
+						"type": "nvarchar"
+					},
+					{
+						"name": "email",
+						"type": "nvarchar"
+					},
+					{
+						"name": "phone_number",
+						"type": "nvarchar"
+					},
+					{
+						"name": "address",
+						"type": "nvarchar"
+					},
+					{
+						"name": "city",
+						"type": "nvarchar"
+					},
+					{
+						"name": "state",
+						"type": "nvarchar"
+					},
+					{
+						"name": "country",
+						"type": "nvarchar"
+					},
+					{
+						"name": "zip_code",
+						"type": "nvarchar"
+					},
+					{
+						"name": "signup_date",
+						"type": "date"
+					},
+					{
+						"name": "last_login",
+						"type": "datetime2",
+						"scale": 7
+					},
+					{
+						"name": "total_bookings",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "total_spent",
+						"type": "decimal",
+						"precision": 14,
+						"scale": 2
+					},
+					{
+						"name": "preferred_language",
+						"type": "nvarchar"
+					},
+					{
+						"name": "referral_code",
+						"type": "nvarchar"
+					},
+					{
+						"name": "account_status",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "airbnb",
+					"table": "dim_customer"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/SynapseConn')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ADLSConn')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ADLSConn_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('ADLSConn_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDBConn')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "CosmosDb",
+				"typeProperties": {
+					"connectionString": "[parameters('CosmosDBConn_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SynapseConn')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"server": "[parameters('SynapseConn_properties_typeProperties_server')]",
+					"database": "[parameters('SynapseConn_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SystemAssignedManagedIdentity"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/New_BookingTransformation')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "New_BookingDataCosmosDBSource",
+								"type": "DatasetReference"
+							},
+							"name": "BookingSourceCosmos"
+						},
+						{
+							"dataset": {
+								"referenceName": "New_BookingsFactSynapse",
+								"type": "DatasetReference"
+							},
+							"name": "SynapseBookingFactTarget"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "New_BookingsFactSynapse",
+								"type": "DatasetReference"
+							},
+							"name": "SynapseTargetWrite"
+						}
+					],
+					"transformations": [
+						{
+							"name": "DataQualityCheck"
+						},
+						{
+							"name": "LookupForInsertUpdateFlag"
+						},
+						{
+							"name": "GenerateInsertUpdateFlags"
+						},
+						{
+							"name": "FinalColumns"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          booking_id as string,",
+						"          customer_id as string,",
+						"          listing_id as string,",
+						"          status as string,",
+						"          booking_created_at as string,",
+						"          checkin_date as string,",
+						"          checkout_date as string,",
+						"          nights as integer,",
+						"          lead_time_days as integer,",
+						"          guests_adults as integer,",
+						"          guests_children as integer,",
+						"          guests_infants as integer,",
+						"          price_nightly as double,",
+						"          cleaning_fee as double,",
+						"          total_amount as double,",
+						"          currency as string,",
+						"          country_code as string,",
+						"          city as string,",
+						"          channel as string,",
+						"          device_type as string,",
+						"          cancellation_ts as string,",
+						"          cancellation_reason as string,",
+						"          updated_at as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     enableChangeFeed: true,",
+						"     changeFeedStartFromTheBeginning: true,",
+						"     format: 'document') ~> BookingSourceCosmos",
+						"source(output(",
+						"          booking_id as string,",
+						"          customer_id as integer,",
+						"          listing_id as string,",
+						"          status as string,",
+						"          booking_created_at as date,",
+						"          checkin_date as date,",
+						"          checkout_date as date,",
+						"          nights as integer,",
+						"          lead_time_days as integer,",
+						"          guests_adults as integer,",
+						"          guests_children as integer,",
+						"          guests_infants as integer,",
+						"          price_nightly as decimal(12,2),",
+						"          cleaning_fee as decimal(12,2),",
+						"          total_amount as decimal(14,2),",
+						"          currency as string,",
+						"          country_code as string,",
+						"          city as string,",
+						"          channel as string,",
+						"          device_type as string,",
+						"          cancellation_ts as timestamp,",
+						"          cancellation_reason as string,",
+						"          updated_at as timestamp",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table',",
+						"     staged: true) ~> SynapseBookingFactTarget",
+						"BookingSourceCosmos split(checkout_date < checkin_date,",
+						"     disjoint: true) ~> DataQualityCheck@(BadRecords, AcceptedRecords)",
+						"DataQualityCheck@AcceptedRecords, SynapseBookingFactTarget lookup(DataQualityCheck@AcceptedRecords@booking_id == SynapseBookingFactTarget@booking_id,",
+						"     multiple: false,",
+						"     pickup: 'first',",
+						"     desc(SynapseBookingFactTarget@updated_at, true),",
+						"     broadcast: 'auto')~> LookupForInsertUpdateFlag",
+						"LookupForInsertUpdateFlag alterRow(insertIf(isNull(SynapseBookingFactTarget@booking_id)),",
+						"     updateIf(not(isNull(SynapseBookingFactTarget@booking_id)))) ~> GenerateInsertUpdateFlags",
+						"GenerateInsertUpdateFlags select(mapColumn(",
+						"          city = DataQualityCheck@AcceptedRecords@city,",
+						"          channel = DataQualityCheck@AcceptedRecords@channel,",
+						"          nights = DataQualityCheck@AcceptedRecords@nights,",
+						"          checkout_date = DataQualityCheck@AcceptedRecords@checkout_date,",
+						"          customer_id = DataQualityCheck@AcceptedRecords@customer_id,",
+						"          guests_adults = DataQualityCheck@AcceptedRecords@guests_adults,",
+						"          listing_id = DataQualityCheck@AcceptedRecords@listing_id,",
+						"          checkin_date = DataQualityCheck@AcceptedRecords@checkin_date,",
+						"          booking_created_at = DataQualityCheck@AcceptedRecords@booking_created_at,",
+						"          device_type = DataQualityCheck@AcceptedRecords@device_type,",
+						"          country_code = DataQualityCheck@AcceptedRecords@country_code,",
+						"          cancellation_reason = DataQualityCheck@AcceptedRecords@cancellation_reason,",
+						"          lead_time_days = DataQualityCheck@AcceptedRecords@lead_time_days,",
+						"          booking_id = DataQualityCheck@AcceptedRecords@booking_id,",
+						"          price_nightly = DataQualityCheck@AcceptedRecords@price_nightly,",
+						"          guests_infants = DataQualityCheck@AcceptedRecords@guests_infants,",
+						"          status = DataQualityCheck@AcceptedRecords@status,",
+						"          guests_children = DataQualityCheck@AcceptedRecords@guests_children,",
+						"          currency = DataQualityCheck@AcceptedRecords@currency,",
+						"          total_amount = DataQualityCheck@AcceptedRecords@total_amount,",
+						"          updated_at = DataQualityCheck@AcceptedRecords@updated_at,",
+						"          cancellation_ts = DataQualityCheck@AcceptedRecords@cancellation_ts,",
+						"          cleaning_fee = DataQualityCheck@AcceptedRecords@cleaning_fee",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> FinalColumns",
+						"FinalColumns sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          booking_id as string,",
+						"          customer_id as integer,",
+						"          listing_id as string,",
+						"          status as string,",
+						"          booking_created_at as date,",
+						"          checkin_date as date,",
+						"          checkout_date as date,",
+						"          nights as integer,",
+						"          lead_time_days as integer,",
+						"          guests_adults as integer,",
+						"          guests_children as integer,",
+						"          guests_infants as integer,",
+						"          price_nightly as decimal(12,2),",
+						"          cleaning_fee as decimal(12,2),",
+						"          total_amount as decimal(14,2),",
+						"          currency as string,",
+						"          country_code as string,",
+						"          city as string,",
+						"          channel as string,",
+						"          device_type as string,",
+						"          cancellation_ts as timestamp,",
+						"          cancellation_reason as string,",
+						"          updated_at as timestamp",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:true,",
+						"     upsertable:false,",
+						"     keys:['booking_id'],",
+						"     format: 'table',",
+						"     staged: true,",
+						"     allowCopyCommand: true,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> SynapseTargetWrite"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/New_BookingDataCosmosDBSource')]",
+				"[concat(variables('factoryId'), '/datasets/New_BookingsFactSynapse')]"
+			]
+		}
+	]
+}

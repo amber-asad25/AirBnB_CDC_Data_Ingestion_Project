@@ -1,0 +1,15 @@
+{
+	"name": "SynapseConn",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDW",
+		"typeProperties": {
+			"server": "synapse-ne-workspace.sql.azuresynapse.net",
+			"database": "synapsedwh",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SystemAssignedManagedIdentity"
+		}
+	}
+}

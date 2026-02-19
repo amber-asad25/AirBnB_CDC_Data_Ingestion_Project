@@ -1,0 +1,124 @@
+{
+	"name": "New_BookingsFactSynapse",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "SynapseConn",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlDWTable",
+		"schema": [
+			{
+				"name": "booking_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "customer_id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "listing_id",
+				"type": "nvarchar"
+			},
+			{
+				"name": "status",
+				"type": "nvarchar"
+			},
+			{
+				"name": "booking_created_at",
+				"type": "date"
+			},
+			{
+				"name": "checkin_date",
+				"type": "date"
+			},
+			{
+				"name": "checkout_date",
+				"type": "date"
+			},
+			{
+				"name": "nights",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "lead_time_days",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "guests_adults",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "guests_children",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "guests_infants",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "price_nightly",
+				"type": "decimal",
+				"precision": 12,
+				"scale": 2
+			},
+			{
+				"name": "cleaning_fee",
+				"type": "decimal",
+				"precision": 12,
+				"scale": 2
+			},
+			{
+				"name": "total_amount",
+				"type": "decimal",
+				"precision": 14,
+				"scale": 2
+			},
+			{
+				"name": "currency",
+				"type": "nvarchar"
+			},
+			{
+				"name": "country_code",
+				"type": "nvarchar"
+			},
+			{
+				"name": "city",
+				"type": "nvarchar"
+			},
+			{
+				"name": "channel",
+				"type": "nvarchar"
+			},
+			{
+				"name": "device_type",
+				"type": "nvarchar"
+			},
+			{
+				"name": "cancellation_ts",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "cancellation_reason",
+				"type": "nvarchar"
+			},
+			{
+				"name": "updated_at",
+				"type": "datetime2",
+				"scale": 7
+			}
+		],
+		"typeProperties": {
+			"schema": "airbnb",
+			"table": "fact_booking"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
