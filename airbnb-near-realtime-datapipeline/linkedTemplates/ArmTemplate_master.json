@@ -1,0 +1,77 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "airbnb-near-realtime-datapipeline"
+		},
+		"ADLSConn_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'ADLSConn'"
+		},
+		"CosmosDBConn_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'CosmosDBConn'"
+		},
+		"ADLSConn_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://projectstorageaccountgds.dfs.core.windows.net/"
+		},
+		"SynapseConn_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "synapse-ne-workspace.sql.azuresynapse.net"
+		},
+		"SynapseConn_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "synapsedwh"
+		},
+		"containerUri": {
+			"type": "string",
+			"metadata": "URI to storage account containing linked ARM templates"
+		},
+		"containerSasToken": {
+			"type": "string",
+			"metadata": "Sas token to storage account containing linked ARM templates"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "airbnb-near-realtime-datapipeline_ArmTemplate_0",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_0.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"ADLSConn_accountKey": {
+						"value": "[parameters('ADLSConn_accountKey')]"
+					},
+					"CosmosDBConn_connectionString": {
+						"value": "[parameters('CosmosDBConn_connectionString')]"
+					},
+					"ADLSConn_properties_typeProperties_url": {
+						"value": "[parameters('ADLSConn_properties_typeProperties_url')]"
+					},
+					"SynapseConn_properties_typeProperties_server": {
+						"value": "[parameters('SynapseConn_properties_typeProperties_server')]"
+					},
+					"SynapseConn_properties_typeProperties_database": {
+						"value": "[parameters('SynapseConn_properties_typeProperties_database')]"
+					}
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}

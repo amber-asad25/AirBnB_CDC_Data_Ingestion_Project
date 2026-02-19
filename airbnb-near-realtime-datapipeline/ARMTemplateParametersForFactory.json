@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "airbnb-near-realtime-datapipeline"
+		},
+		"ADLSConn_accountKey": {
+			"value": ""
+		},
+		"CosmosDBConn_connectionString": {
+			"value": ""
+		},
+		"ADLSConn_properties_typeProperties_url": {
+			"value": "https://projectstorageaccountgds.dfs.core.windows.net/"
+		},
+		"SynapseConn_properties_typeProperties_server": {
+			"value": "synapse-ne-workspace.sql.azuresynapse.net"
+		},
+		"SynapseConn_properties_typeProperties_database": {
+			"value": "synapsedwh"
+		}
+	}
+}
