@@ -33,7 +33,7 @@
 				}
 			},
 			{
-				"name": "ProcessEachCustomerFiles",
+				"name": "ProcessEachCustomerFile",
 				"type": "ForEach",
 				"dependsOn": [
 					{
