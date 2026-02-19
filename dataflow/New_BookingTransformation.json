@@ -1,0 +1,183 @@
+{
+	"name": "New_BookingTransformation",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "New_BookingDataCosmosDBSource",
+						"type": "DatasetReference"
+					},
+					"name": "BookingSourceCosmos"
+				},
+				{
+					"dataset": {
+						"referenceName": "New_BookingsFactSynapse",
+						"type": "DatasetReference"
+					},
+					"name": "SynapseBookingFactTarget"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "New_BookingsFactSynapse",
+						"type": "DatasetReference"
+					},
+					"name": "SynapseTargetWrite"
+				}
+			],
+			"transformations": [
+				{
+					"name": "DataQualityCheck"
+				},
+				{
+					"name": "LookupForInsertUpdateFlag"
+				},
+				{
+					"name": "GenerateInsertUpdateFlags"
+				},
+				{
+					"name": "FinalColumns"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          booking_id as string,",
+				"          customer_id as string,",
+				"          listing_id as string,",
+				"          status as string,",
+				"          booking_created_at as string,",
+				"          checkin_date as string,",
+				"          checkout_date as string,",
+				"          nights as integer,",
+				"          lead_time_days as integer,",
+				"          guests_adults as integer,",
+				"          guests_children as integer,",
+				"          guests_infants as integer,",
+				"          price_nightly as double,",
+				"          cleaning_fee as double,",
+				"          total_amount as double,",
+				"          currency as string,",
+				"          country_code as string,",
+				"          city as string,",
+				"          channel as string,",
+				"          device_type as string,",
+				"          cancellation_ts as string,",
+				"          cancellation_reason as string,",
+				"          updated_at as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     enableChangeFeed: true,",
+				"     changeFeedStartFromTheBeginning: true,",
+				"     format: 'document') ~> BookingSourceCosmos",
+				"source(output(",
+				"          booking_id as string,",
+				"          customer_id as integer,",
+				"          listing_id as string,",
+				"          status as string,",
+				"          booking_created_at as date,",
+				"          checkin_date as date,",
+				"          checkout_date as date,",
+				"          nights as integer,",
+				"          lead_time_days as integer,",
+				"          guests_adults as integer,",
+				"          guests_children as integer,",
+				"          guests_infants as integer,",
+				"          price_nightly as decimal(12,2),",
+				"          cleaning_fee as decimal(12,2),",
+				"          total_amount as decimal(14,2),",
+				"          currency as string,",
+				"          country_code as string,",
+				"          city as string,",
+				"          channel as string,",
+				"          device_type as string,",
+				"          cancellation_ts as timestamp,",
+				"          cancellation_reason as string,",
+				"          updated_at as timestamp",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table',",
+				"     staged: true) ~> SynapseBookingFactTarget",
+				"BookingSourceCosmos split(checkout_date < checkin_date,",
+				"     disjoint: true) ~> DataQualityCheck@(BadRecords, AcceptedRecords)",
+				"DataQualityCheck@AcceptedRecords, SynapseBookingFactTarget lookup(DataQualityCheck@AcceptedRecords@booking_id == SynapseBookingFactTarget@booking_id,",
+				"     multiple: false,",
+				"     pickup: 'first',",
+				"     desc(SynapseBookingFactTarget@updated_at, true),",
+				"     broadcast: 'auto')~> LookupForInsertUpdateFlag",
+				"LookupForInsertUpdateFlag alterRow(insertIf(isNull(SynapseBookingFactTarget@booking_id)),",
+				"     updateIf(not(isNull(SynapseBookingFactTarget@booking_id)))) ~> GenerateInsertUpdateFlags",
+				"GenerateInsertUpdateFlags select(mapColumn(",
+				"          city = DataQualityCheck@AcceptedRecords@city,",
+				"          channel = DataQualityCheck@AcceptedRecords@channel,",
+				"          nights = DataQualityCheck@AcceptedRecords@nights,",
+				"          checkout_date = DataQualityCheck@AcceptedRecords@checkout_date,",
+				"          customer_id = DataQualityCheck@AcceptedRecords@customer_id,",
+				"          guests_adults = DataQualityCheck@AcceptedRecords@guests_adults,",
+				"          listing_id = DataQualityCheck@AcceptedRecords@listing_id,",
+				"          checkin_date = DataQualityCheck@AcceptedRecords@checkin_date,",
+				"          booking_created_at = DataQualityCheck@AcceptedRecords@booking_created_at,",
+				"          device_type = DataQualityCheck@AcceptedRecords@device_type,",
+				"          country_code = DataQualityCheck@AcceptedRecords@country_code,",
+				"          cancellation_reason = DataQualityCheck@AcceptedRecords@cancellation_reason,",
+				"          lead_time_days = DataQualityCheck@AcceptedRecords@lead_time_days,",
+				"          booking_id = DataQualityCheck@AcceptedRecords@booking_id,",
+				"          price_nightly = DataQualityCheck@AcceptedRecords@price_nightly,",
+				"          guests_infants = DataQualityCheck@AcceptedRecords@guests_infants,",
+				"          status = DataQualityCheck@AcceptedRecords@status,",
+				"          guests_children = DataQualityCheck@AcceptedRecords@guests_children,",
+				"          currency = DataQualityCheck@AcceptedRecords@currency,",
+				"          total_amount = DataQualityCheck@AcceptedRecords@total_amount,",
+				"          updated_at = DataQualityCheck@AcceptedRecords@updated_at,",
+				"          cancellation_ts = DataQualityCheck@AcceptedRecords@cancellation_ts,",
+				"          cleaning_fee = DataQualityCheck@AcceptedRecords@cleaning_fee",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> FinalColumns",
+				"FinalColumns sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          booking_id as string,",
+				"          customer_id as integer,",
+				"          listing_id as string,",
+				"          status as string,",
+				"          booking_created_at as date,",
+				"          checkin_date as date,",
+				"          checkout_date as date,",
+				"          nights as integer,",
+				"          lead_time_days as integer,",
+				"          guests_adults as integer,",
+				"          guests_children as integer,",
+				"          guests_infants as integer,",
+				"          price_nightly as decimal(12,2),",
+				"          cleaning_fee as decimal(12,2),",
+				"          total_amount as decimal(14,2),",
+				"          currency as string,",
+				"          country_code as string,",
+				"          city as string,",
+				"          channel as string,",
+				"          device_type as string,",
+				"          cancellation_ts as timestamp,",
+				"          cancellation_reason as string,",
+				"          updated_at as timestamp",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:true,",
+				"     upsertable:false,",
+				"     keys:['booking_id'],",
+				"     format: 'table',",
+				"     staged: true,",
+				"     allowCopyCommand: true,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> SynapseTargetWrite"
+			]
+		}
+	}
+}

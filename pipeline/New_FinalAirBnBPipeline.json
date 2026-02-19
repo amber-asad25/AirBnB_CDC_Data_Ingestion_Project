@@ -1,0 +1,49 @@
+{
+	"name": "New_FinalAirBnBPipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "RunLoadCustomerDimPipeline",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "New_LoadCustomerDim",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "RunLoadBookingFactPipeline",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "RunLoadCustomerDimPipeline",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "New_LoadBookingFact",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2026-02-19T11:44:41Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
